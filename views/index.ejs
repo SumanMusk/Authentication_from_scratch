@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DashBoard</title>
+</head>
+<body>
+    <h2>This is home page</h2><br>
+    <form action="/main-work">
+        <button style="margin-bottom: 3%; margin-left: 4%;">Get Started</button>
+    </form>
+    <div style="display: flex;">
+        <form action="/login">
+            <button id="loginBtn">Login</button>
+        </form>
+        <% if(isLoggedIn) { %> 
+            <form action="/sign-up" style="margin-left: 7%; display: none;">
+                <button id="signupBtn">SignUp</button>
+            </form>
+        <% } else {%> 
+            <form action="/sign-up" style="margin-left: 7%; display: block;">
+                <button id="signupBtn">SignUp</button>
+            </form>
+        <% } %> 
+    </div>
+</body>
+<script>
+    const loginBtn = document.getElementById("loginBtn");
+    const signupBtn = document.getElementById("signupBtn");
+    loginBtn.onclick = () => {
+        
+    }
+</script>
+</html>
