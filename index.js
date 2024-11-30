@@ -1,13 +1,15 @@
+require("dotenv").config();
 const express = require("express");
 const path = require("path");
-require("dotenv").config();
 const cookieParser = require("cookie-parser");
 const { v4: uuidv4 } = require("uuid");
 const mongoose = require("mongoose");
 const userdata = require("./db_schema");
 
-const { setter } = require("./map_service");
-const { verify_user } = require("./middlewares/verify");
+const { setter, jwt_setter } = require("./map_service");
+const { verify_user, verify_by_jwt, restrictToNormal } = require("./middlewares/verify");
+const { validateLoggedInOrNot } = require("./middlewares/isLoggedIn");
+const { infoSetterToReqObj } = require("./middlewares/userInfoSetter");
 
 const PORT = process.env.PORT;
 const DB_URL = process.env.DB_URl;
@@ -24,10 +26,23 @@ app.use(cookieParser());
 const isLoggedIn = false;
 
 app.get("/", (req, res) => {
-    res.render("index", { isLoggedIn });
+    const loggedIn_state = validateLoggedInOrNot(req);
+    res.render("index", { isLoggedIn, loggedIn_state });
 });
 
-app.get("/main-work", verify_user, (req, res) => {
+// stateful method validation
+// app.get("/main-work", verify_user, (req, res) => {
+//     const cookieUserName = req.cookies.LoggedUserName;
+//     res.render("only_loggedIn", { cookieUserName });
+// });
+
+// stateless method validation (just using the verify_by_jwt() instead of using verify_user())
+app.get("/main-work", verify_by_jwt, (req, res) => {
+    const cookieUserName = req.cookies.LoggedUserName;
+    res.render("only_loggedIn", { cookieUserName });
+});
+
+app.get("/admins-only", restrictToNormal(["NORMAL"]), (req, res) => {
     const cookieUserName = req.cookies.LoggedUserName;
     res.render("only_loggedIn", { cookieUserName });
 });
@@ -41,7 +56,7 @@ app.get("/sign-up", (req, res) => {
 });
 
 app.post("/signup-verify", async (req, res) => {
-    const { username, age, password } = req.body;
+    const { username, age, role, password } = req.body;
 
     const data = await userdata.findOne({ name: username });
 
@@ -51,47 +66,28 @@ app.post("/signup-verify", async (req, res) => {
         res.render("signup", { name: username, alreadySigned: alreadySigned });
     }
     else {
-        await userdata.create({ name: username, age: age, password: password });
+        await userdata.create({ name: username, age: age, role: role, password: password });
         res.redirect("/login");
     }    
 });
 
-app.post("/login-verify", async (req, res) => {
-    const { username, password } = req.body;
+app.post("/login-verify", infoSetterToReqObj, async (req, res) => {
+    const { id, username, password, role } = req.user;      
+        // const loginCookie = uuidv4();
+        // res.cookie("token", loginCookie);
+
+        // res.cookie("LoggedUserName", username);
+        // setter(loginCookie, data_by_name._id); //map_service.js
+
+        // Using JWT token system: we'll create a token by jwt.sign() then we'll verify that user by passing the token into jwt.verify() in seperate two getter-setter methods in map_service.js file
     
-    // Simply we can do this for normal validation
-    // const data_by_name = await userdata.findOne({ name: username, password: password });
-
-    // for safety, if multiple if-else case conditions get satisfied then multiple res.render() can trigger causing error "Cannot set headers after they are sent to the client". So we write "return" in front of each res.render into each if-else cases.
-
-    const data_by_name = await userdata.findOne({ name: username });
-    const data_by_pass = await userdata.findOne({ password: password });
-
-    let isAccExists = false;
-    let isWrongName = false;
-    let isWrongPass = false;
-
-    if(data_by_name === null && data_by_pass === null) {
-        isAccExists = true;
-        return res.render("login", { isAccExists, isWrongName, isWrongPass });
-    }
-    else if(data_by_name !== null && data_by_pass === null) {
-        isWrongPass = true;
-        return res.render("login", { isAccExists, isWrongName, isWrongPass });
-    }
-    else if(data_by_name === null && data_by_pass !== null) {
-        isWrongName = true;
-        return res.render("login", { isAccExists, isWrongName, isWrongName });
-    }
-    else {        
-        const loginCookie = uuidv4();
-        res.cookie("token", loginCookie);
-
-        res.cookie("LoggedUserName", username);
-        setter(loginCookie, data_by_name._id); //map_service.js
-
-        return res.redirect("/");
-    }
+    const token = jwt_setter(id, username, role); //map_service.js
+    res.cookie("jwt_token_cookie", token);
+    
+    res.cookie("LoggedUserName", username);
+    res.cookie("loggedIn_state", true);
+    
+    return res.redirect("/");
 });
 
 mongoose.connect(DB_URL)
@@ -105,3 +101,6 @@ mongoose.connect(DB_URL)
 app.listen(PORT, () => {
     console.log("server running!");
 });
+
+// mongodb $Env:MDB_CONNECTION_STRING
+// Short form => mongosh

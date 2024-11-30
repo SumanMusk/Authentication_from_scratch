@@ -15,6 +15,11 @@ const schema = mongoose.Schema({
         required: true,
         unique: true
     },
+    role: {
+        type: String,
+        // required: true,
+        default: "NORMAL"
+    }
 }, 
     { collection: "allData" }
 );
